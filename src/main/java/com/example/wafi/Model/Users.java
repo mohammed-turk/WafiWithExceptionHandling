@@ -20,7 +20,7 @@ public class Users {
     private Integer id;
 
     @Column(columnDefinition = "varchar(50) not null")
-    @NotEmpty
+    @NotEmpty(message = "name can not be empty")
     @Size(max = 50, message = "name max length is 50")
     private String name;
 
@@ -34,4 +34,6 @@ public class Users {
     @Size(min = 10, max = 10, message = "phone length should be 10")
     @Pattern(regexp = "^05.*", message = "phone number should start with 05")
     private String phoneNumber;
+
+
 }

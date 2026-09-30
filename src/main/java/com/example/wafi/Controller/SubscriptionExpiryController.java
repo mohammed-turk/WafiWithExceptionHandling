@@ -21,9 +21,6 @@ public class SubscriptionExpiryController {
     @PostMapping("/notify/{subscriptionId}")
     public ResponseEntity<?> forceNotify(@PathVariable Integer subscriptionId) {
         String suggestion = subscriptionExpiryService.forceNotify(subscriptionId);
-        if (suggestion == null)
-            return ResponseEntity.status(400).body(new APIResponse("no such subscription exists"));
-
         return ResponseEntity.status(200).body(new APIResponse("notification sent: " + suggestion));
     }
 }

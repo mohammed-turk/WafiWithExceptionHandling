@@ -1,5 +1,6 @@
 package com.example.wafi.Service;
 
+import com.example.wafi.API.APIException;
 import com.example.wafi.Model.IssueReports;
 import com.example.wafi.Model.Subscriptions;
 import com.example.wafi.Model.Users;
@@ -18,45 +19,48 @@ public class UsersService {
     private final SubscriptionsRepository subscriptionsRepository;
     private final IssueReportsRepository issueReportsRepository;
 
+    private Users getUserOrThrow(Integer userId){
+        Users user = usersRepository.findUsersById(userId);
+        if (user == null)
+            throw new APIException("user not found");
+        if (user.getId() != null)
+            throw new APIException("id is auto generated, do not send it");
+        return user;
+    }
+
     public List<Users> get(){
         return usersRepository.findAll();
     }
 
-    public Boolean add(Users user){
+    public void add(Users user){
         if (usersRepository.existsByEmail(user.getEmail()))
-            return false;
-
+            throw new APIException("user email already exist");
         usersRepository.save(user);
-        return true;
     }
 
-    public Boolean update(Integer userId, Users user){
-        Users oldUser = usersRepository.findUsersById(userId);
-
-        if (oldUser == null)
-            return false;
+    public void update(Integer userId, Users user){
+        Users oldUser = getUserOrThrow(userId);
 
         oldUser.setEmail(user.getEmail());
         oldUser.setName(user.getName());
         oldUser.setPhoneNumber(user.getPhoneNumber());
         usersRepository.save(oldUser);
-        return true;
+
     }
 
-    public Boolean delete(Integer userId){
-        Users user = usersRepository.findUsersById(userId);
-        if (user == null)
-            return false;
-
+    public void delete(Integer userId){
+        Users user = getUserOrThrow(userId);
         usersRepository.delete(user);
-        return true;
+
     }
 
     public Integer getSubscriptionCount(Integer userId) {
+        getUserOrThrow(userId);
         return subscriptionsRepository.findSubscriptionsByUserId(userId).size();
     }
 
     public List<IssueReports> getUserIssueReports(Integer userId) {
+        getUserOrThrow(userId);
         return issueReportsRepository.findIssueReportsByUserId(userId);
     }
 

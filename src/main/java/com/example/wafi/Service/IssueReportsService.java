@@ -1,5 +1,6 @@
 package com.example.wafi.Service;
 
+import com.example.wafi.API.APIException;
 import com.example.wafi.API.APIResponse;
 import com.example.wafi.Model.IssueReports;
 import com.example.wafi.Model.Subscriptions;
@@ -23,6 +24,13 @@ public class IssueReportsService {
     private final SubscriptionsRepository subscriptionsRepository;
     private final AIService aiService;
 
+    private IssueReports getIssueReportOrThrow(Integer issueReportId){
+        IssueReports issueReport = issueReportsRepository.findIssueReportsById(issueReportId);
+        if (issueReport == null)
+            throw new APIException("issue report not found");
+        return issueReport;
+    }
+
     public List<IssueReports> get(){
         return issueReportsRepository.findAll();
     }
@@ -31,56 +39,59 @@ public class IssueReportsService {
         return issueReportsRepository.findIssueReportsById(issueReportId);
     }
 
-    public APIResponse add(IssueReports issueReport){
-        if (usersRepository.findUsersById(issueReport.getUserId()) == null)
-            return new APIResponse("no such user exist");
+    public void add(IssueReports issueReport){
+        if (issueReport.getId() != null)
+            throw new APIException("id is auto generated, do not send it");
 
-        if (subscriptionsRepository.findSubscriptionsById(issueReport.getSubscriptionId()) == null)
-            return new APIResponse("no such subscription exist");
+        if (usersRepository.findUsersById(issueReport.getUserId()) == null)
+            throw new APIException("no such user exist");
+
+        Subscriptions subscription = subscriptionsRepository.findSubscriptionsById(issueReport.getSubscriptionId());
+        if (subscription == null)
+            throw new APIException("subscription not found");
+
+        if (!subscription.getUserId().equals(issueReport.getUserId()))
+            throw new APIException("subscription does not belong to this user");
 
         issueReport.setStatus("OPEN");
+        issueReport.setAiResponse(null);
         issueReportsRepository.save(issueReport);
-        return null;
     }
 
-    public APIResponse update(Integer issueReportId, IssueReports issueReport){
-        IssueReports oldIssueReport = issueReportsRepository.findIssueReportsById(issueReportId);
-
-        if (oldIssueReport == null)
-            return new APIResponse("no such issue report exist");
+    public void update(Integer issueReportId, IssueReports issueReport){
+        IssueReports oldIssueReport = getIssueReportOrThrow(issueReportId);
 
         oldIssueReport.setDescription(issueReport.getDescription());
         issueReportsRepository.save(oldIssueReport);
-        return null;
     }
 
-    public APIResponse delete(Integer issueReportId){
-        IssueReports issueReport = issueReportsRepository.findIssueReportsById(issueReportId);
-
-        if (issueReport == null)
-            return new APIResponse("no such issue report exist");
+    public void delete(Integer issueReportId){
+        IssueReports issueReport = getIssueReportOrThrow(issueReportId);
 
         issueReportsRepository.delete(issueReport);
-        return null;
+
     }
 
-    public Boolean resolveIssue(Integer issueReportId) {
-        IssueReports issue = issueReportsRepository.findIssueReportsById(issueReportId);
-        if (issue == null)
-            return false;
-
+    public void resolveIssue(Integer issueReportId) {
+        IssueReports issue = getIssueReportOrThrow(issueReportId);
         issue.setStatus("RESOLVED");
         issueReportsRepository.save(issue);
-        return true;
     }
 
     public List<IssueReports> getByStatus(String status){
-        return issueReportsRepository.findIssueReportsByStatus(status);
+        String normalized = status.toUpperCase();
+        if (!normalized.equals("OPEN") && !normalized.equals("RESOLVED"))
+            throw new APIException("status must be OPEN or RESOLVED");
+
+        return issueReportsRepository.findIssueReportsByStatus(normalized);
     }
 
     public List<IssueReports> getBySubscription(Integer subscriptionId){
+        if (subscriptionsRepository.findSubscriptionsById(subscriptionId) == null)
+            throw new APIException("subscription not found");
+
         return issueReportsRepository.findIssueReportsBySubscriptionId(subscriptionId);
-    }
+         }
 
     public List<Map<String, Object>> getOpenCountPerUser() {
         List<IssueReports> openIssues = issueReportsRepository.findIssueReportsByStatus("OPEN");
@@ -102,8 +113,7 @@ public class IssueReportsService {
     }
 
     public String resolveWithAi(Integer issueReportId) {
-        IssueReports issue = issueReportsRepository.findIssueReportsById(issueReportId);
-        if (issue == null) return null;
+        IssueReports issue = getIssueReportOrThrow(issueReportId);
 
         Subscriptions sub = subscriptionsRepository.findSubscriptionsById(issue.getSubscriptionId());
         String planContext = sub != null
@@ -119,6 +129,10 @@ public class IssueReportsService {
         );
 
         String aiResponse = aiService.callAi(prompt);
+
+        if (aiResponse == null || aiResponse.isBlank())
+            throw new APIException("AI service returned no response, try again later");
+
         issue.setAiResponse(aiResponse);
         issueReportsRepository.save(issue);
         return aiResponse;

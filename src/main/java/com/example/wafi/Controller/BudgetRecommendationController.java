@@ -14,11 +14,6 @@ public class BudgetRecommendationController {
 
     @GetMapping("/{budget}/{category}")
     public ResponseEntity<?> recommend(@PathVariable Double budget, @PathVariable String category){
-        String normalized = category.toLowerCase();
-        if (!normalized.equals("data") && !normalized.equals("minutes") && !normalized.equals("compo"))
-            return ResponseEntity.status(400).body(new APIResponse("category must be data, minutes, or compo"));
-
-        String recommendation = budgetRecommendationService.recommend(budget, normalized);
-        return ResponseEntity.status(200).body(new APIResponse(recommendation));
+        return ResponseEntity.status(200).body(new APIResponse(budgetRecommendationService.recommend(budget, category)));
     }
 }

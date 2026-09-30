@@ -1,7 +1,9 @@
 package com.example.wafi.Service;
 
+import com.example.wafi.API.APIException;
 import com.example.wafi.Model.Subscriptions;
 import com.example.wafi.Repository.SubscriptionsRepository;
+import com.example.wafi.Repository.UsersRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -12,22 +14,34 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SubscriptionsService {
     private final SubscriptionsRepository subscriptionsRepository;
+    private final UsersRepository usersRepository;
 
+    private Subscriptions getSubscriptionOrThrow(Integer subscriptionId){
+        Subscriptions subscription = subscriptionsRepository.findSubscriptionsById(subscriptionId);
+        if (subscription == null)
+            throw new APIException("subscription not found");
+        return subscription;
+    }
+
+    private void checkUserExists(Integer userId){
+        if (usersRepository.findUsersById(userId) == null)
+            throw new APIException("user not found");
+    }
     public List<Subscriptions> get(){
         return subscriptionsRepository.findAll();
     }
 
     public void add(Subscriptions subscription){
+        if (subscription.getId() != null)
+            throw new APIException("id is auto generated, do not send it");
+        checkUserExists(subscription.getUserId());
         subscription.setStatus("ACTIVE");
         subscription.setSent(false);
         subscriptionsRepository.save(subscription);
     }
 
-    public Boolean update(Integer subscriptionId, Subscriptions subscription){
-        Subscriptions oldSubscription = subscriptionsRepository.findSubscriptionsById(subscriptionId);
-
-        if (oldSubscription == null)
-            return false;
+    public void update(Integer subscriptionId, Subscriptions subscription){
+        Subscriptions oldSubscription = getSubscriptionOrThrow(subscriptionId);
 
         oldSubscription.setAutoRenew(subscription.getAutoRenew());
         oldSubscription.setCategory(subscription.getCategory());
@@ -39,26 +53,22 @@ public class SubscriptionsService {
         oldSubscription.setProviderName(subscription.getProviderName());
         oldSubscription.setSmsAllowance(subscription.getSmsAllowance());
         oldSubscription.setStartDate(subscription.getStartDate());
-
         subscriptionsRepository.save(oldSubscription);
-        return true;
+
     }
 
-    public Boolean delete(Integer subscriptionId){
-        Subscriptions desiredSubscription = subscriptionsRepository.findSubscriptionsById(subscriptionId);
-
-        if (desiredSubscription == null)
-            return false;
-
+    public void delete(Integer subscriptionId){
+        Subscriptions desiredSubscription = getSubscriptionOrThrow(subscriptionId);
         subscriptionsRepository.delete(desiredSubscription);
-        return true;
     }
 
     public List<Subscriptions> getUserSubscriptions(Integer userId) {
+        checkUserExists(userId);
         return subscriptionsRepository.findSubscriptionsByUserId(userId);
     }
 
     public Double getTotalSpend(Integer userId) {
+        checkUserExists(userId);
         List<Subscriptions> activeSubs = subscriptionsRepository.findSubscriptionsByUserIdAndStatus(userId, "ACTIVE");
         double total = 0;
         for (Subscriptions s : activeSubs) {
@@ -68,17 +78,14 @@ public class SubscriptionsService {
     }
 
     public Boolean activate(Integer subscriptionId) {
-        Subscriptions subscription = subscriptionsRepository.findSubscriptionsById(subscriptionId);
-        if (subscription == null) return false;
-
+        Subscriptions subscription = getSubscriptionOrThrow(subscriptionId);
         subscription.setStatus("ACTIVE");
         subscriptionsRepository.save(subscription);
         return true;
     }
 
     public Boolean expire(Integer subscriptionId) {
-        Subscriptions subscription = subscriptionsRepository.findSubscriptionsById(subscriptionId);
-        if (subscription == null) return false;
+        Subscriptions subscription = getSubscriptionOrThrow(subscriptionId);
 
         subscription.setStatus("EXPIRED");
         subscriptionsRepository.save(subscription);
@@ -88,7 +95,7 @@ public class SubscriptionsService {
     public List<Subscriptions> getByCategory(String category){
         String normalized = category.toLowerCase();
         if (!normalized.equals("data") && !normalized.equals("minutes") && !normalized.equals("compo"))
-            return null;
+            throw new APIException("category must be data, minutes, or compo");
 
         return subscriptionsRepository.findSubscriptionsByCategory(normalized);
     }

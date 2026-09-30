@@ -9,12 +9,13 @@ import java.util.List;
 
 @Repository
 public interface UsersRepository extends JpaRepository<Users, Integer> {
+
     Users findUsersById(Integer id);
     boolean existsByEmail(String email);
 
     @Query("select u from Users u where " +
             "(select count(s) from Subscriptions s where s.userId = u.id and s.status = 'ACTIVE') >= 3 " +
-            "and (select coalesce(sum(s.charge), 0) from Subscriptions s where s.userId = u.id and s.status = 'ACTIVE') >= 200")
+            "and (select coalesce(sum(s.charge), 0) from Subscriptions s where s.userId = u.id and s.status = 'ACTIVE') >= 400")
     List<Users> findVipUsers();
 
     @Query("select u from Users u where " +
